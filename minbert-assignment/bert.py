@@ -16,7 +16,7 @@ class BertSelfAttention(nn.Module):
     self.all_head_size = self.num_attention_heads * self.attention_head_size
 
     # initialize the linear transformation layers for key, value, query
-    self.query = nn.Linear(config.hidden_size, self.all_head_size)
+    self.query = nn.Linear(config.hidden_size, self.all_head_size) 
     self.key = nn.Linear(config.hidden_size, self.all_head_size)
     self.value = nn.Linear(config.hidden_size, self.all_head_size)
     # this dropout is applied to normalized attention scores following the original implementation of transformer
@@ -24,9 +24,10 @@ class BertSelfAttention(nn.Module):
     self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
   def transform(self, x, linear_layer):
-    # the corresponding linear_layer of k, v, q are used to project the hidden_state (x)
+    # the corresponding linear_layer of k, v, q are used to project the hidden_state (x) [bs, seq_len, hidden_state]
     bs, seq_len = x.shape[:2]
-    proj = linear_layer(x)
+    proj = linear_layer(x) # Linear(hidden_size=768, all_head_size=n_head*attn_head_size=12*int(768/12)=
+    # -> [bs, seq_len, all_head_size]
     # next, we need to produce multiple heads for the proj 
     # this is done by spliting the hidden state to self.num_attention_heads, each of size self.attention_head_size
     proj = proj.view(bs, seq_len, self.num_attention_heads, self.attention_head_size)
@@ -35,28 +36,31 @@ class BertSelfAttention(nn.Module):
     return proj
 
   def attention(self, key, query, value, attention_mask):
+    """
+    key, query, value = [bs, num_attention_heads, seq_len, attention_head_size]
+    """
+    bs, _, seq_len, _ = key.shape
     # each attention is calculated following eq (1) of https://arxiv.org/pdf/1706.03762.pdf
     # attention scores are calculated by multiply query and key 
     # and get back a score matrix S of [bs, num_attention_heads, seq_len, seq_len]
-    # S = torch.bmm(query, key)
-    S = torch.matmul(query, key)
+    attn = torch.matmul(query, key.transpose(2,3))
+    # d_k = key.shape[-1]
+    attn /= math.sqrt(key.shape[-1])
     # S[*, i, j, k] represents the (unnormalized)attention score between the j-th and k-th token, given by i-th attention head
     # before normalizing the scores, use the attention mask to mask out the padding token scores
     # -> attention_mask: [bs, 1, 1, seq_len]
     # Note again: in the attention_mask non-padding tokens with 0 and padding tokens with a large negative number 
-    S.masked_fill_(attention_mask == 0, -1e9)
-    d_k = key.shape[-1]
-    S = S/math.sqrt(d_k)
+    attn.masked_fill_(attention_mask == 0, -1e9)
 
     # normalize the scores
-    attn = F.softmax(S, dim=-1)
+    attn = F.softmax(attn, dim=-1) # across attentions scores, each key x query = last dim
 
     # multiply the attention scores to the value and get back V' 
-    attn = torch.bmm(attn, value)
+    attn = torch.matmul(attn, value) # [bs, n_head, seq_len, attention_head_size]
 
     # next, we need to concat multi-heads and recover the original shape [bs, seq_len, num_attention_heads * attention_head_size = hidden_size]
-    
-    raise NotImplementedError
+    attn = attn.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
+    raise attn
 
   def forward(self, hidden_states, attention_mask):
     """
@@ -66,7 +70,7 @@ class BertSelfAttention(nn.Module):
     """
     # first, we have to generate the key, value, query for each token for multi-head attention w/ transform (more details inside the function)
     # of *_layers are of [bs, num_attention_heads, seq_len, attention_head_size]
-    key_layer = self.transform(hidden_states, self.key)
+    key_layer = self.transform(hidden_states, self.key) # [bs, hidden_size=768, n_head=12, attention_head_size=768/12]
     value_layer = self.transform(hidden_states, self.value)
     query_layer = self.transform(hidden_states, self.query)
     # calculate the multi-head attention 
@@ -118,7 +122,7 @@ class BertLayer(nn.Module):
     """
     # todo
     # multi-head attention w/ self.self_attention
-    output = self.self_attention.forward(hidden_states, attention_mask)
+    output = self.self_attention.forward(hidden_states, attention_mask) # return attention_value
     # add-norm layer
     output = self.add_norm(
       hidden_states,
