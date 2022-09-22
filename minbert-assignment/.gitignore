@@ -1,0 +1,8 @@
+.idea/*
+*.txt.tmp
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Cloned git 
+.git
