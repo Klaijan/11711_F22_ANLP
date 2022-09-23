@@ -43,24 +43,27 @@ class BertSelfAttention(nn.Module):
     # each attention is calculated following eq (1) of https://arxiv.org/pdf/1706.03762.pdf
     # attention scores are calculated by multiply query and key 
     # and get back a score matrix S of [bs, num_attention_heads, seq_len, seq_len]
-    attn = torch.matmul(query, key.transpose(2,3))
+    attn_score = torch.matmul(query, key.transpose(2,3))
     # d_k = key.shape[-1]
-    attn /= math.sqrt(key.shape[-1])
+    attn_score /= math.sqrt(key.shape[-1])
     # S[*, i, j, k] represents the (unnormalized)attention score between the j-th and k-th token, given by i-th attention head
     # before normalizing the scores, use the attention mask to mask out the padding token scores
     # -> attention_mask: [bs, 1, 1, seq_len]
     # Note again: in the attention_mask non-padding tokens with 0 and padding tokens with a large negative number 
-    attn.masked_fill_(attention_mask == 0, -1e9)
+    if attention_mask is not None: 
+      # attn_score.masked_fill_(attention_mask == 0, -1e9)
+      attn_score = attn_score + attention_mask
 
     # normalize the scores
-    attn = F.softmax(attn, dim=-1) # across attentions scores, each key x query = last dim
+    attn = F.softmax(attn_score, dim=-1) # across attentions scores, each key x query = last dim
+    attn = self.dropout(attn)
 
     # multiply the attention scores to the value and get back V' 
-    attn = torch.matmul(attn, value) # [bs, n_head, seq_len, attention_head_size]
+    attn_value = torch.matmul(attn, value) # [bs, n_head, seq_len, attention_head_size]
 
     # next, we need to concat multi-heads and recover the original shape [bs, seq_len, num_attention_heads * attention_head_size = hidden_size]
-    attn = attn.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
-    raise attn
+    attn_value = attn_value.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
+    return attn_value, attn
 
   def forward(self, hidden_states, attention_mask):
     """
@@ -74,7 +77,7 @@ class BertSelfAttention(nn.Module):
     value_layer = self.transform(hidden_states, self.value)
     query_layer = self.transform(hidden_states, self.query)
     # calculate the multi-head attention 
-    attn_value = self.attention(key_layer, query_layer, value_layer, attention_mask)
+    attn_value, _ = self.attention(key_layer, query_layer, value_layer, attention_mask)
     return attn_value
 
 
@@ -106,9 +109,14 @@ class BertLayer(nn.Module):
     """
     # todo
 
-    # layer norm and dropout
+    # dense, dropout, add, layer norm
 
-    raise NotImplementedError # should give weights and bias
+    output = dense_layer(output)
+    output += input
+    output = ln_layer(output)
+    output = dropout(output)
+
+    return output
 
   def forward(self, hidden_states, attention_mask):
     """
@@ -123,6 +131,7 @@ class BertLayer(nn.Module):
     # todo
     # multi-head attention w/ self.self_attention
     output = self.self_attention.forward(hidden_states, attention_mask) # return attention_value
+
     # add-norm layer
     output = self.add_norm(
       hidden_states,
@@ -131,15 +140,23 @@ class BertLayer(nn.Module):
       self.attention_dropout,
       self.attention_layer_norm
       ) 
-    # input, output, dense_layer, dropout, ln_layer
+
     # feed forward
-    output = self.interm_af()
-    # FFN(x) = max(0, xW_1 + b_1)W_2 + b_2
+    layer_input = output
+    output = self.interm_dense(output)
+    output = self.interm_af(output)
+    # output = self.interm_dense(output)
+
     # another add-norm layer
-    output = self.add_norm()
+    output = self.add_norm(
+      layer_input, 
+      output,
+      self.out_dense,
+      self.out_dropout,
+      self.out_layer_norm
+    )
 
-
-    raise NotImplementedError
+    return output
 
 
 class BertModel(BertPreTrainedModel):
