@@ -30,15 +30,13 @@ class AdamW(Optimizer):
         if closure is not None:
             loss = closure()
 
-        for group in self.param_groups:
+        for group in self.param_groups: # dict 
             for p in group["params"]:
                 if p.grad is None:
                     continue
                 grad = p.grad.data
                 if grad.is_sparse:
                     raise RuntimeError("Adam does not support sparse gradients, please consider SparseAdam instead")
-
-                raise NotImplementedError()
 
                 # State should be stored in this dictionary
                 state = self.state[p]
@@ -47,6 +45,13 @@ class AdamW(Optimizer):
                 alpha = group["lr"]
 
                 # Update first and second moments of the gradients
+                if len(state) == 0:
+                    state['step'] = 0
+                    # exp moving average of moving average (mean) of the gradient - first moment
+                    state['exp_mean'] = torch.zeros_like(p.data)
+                    # exp moving average of uncentered variance of the gradient - second moment
+                    state['exp_var'] = torch.zeros_like(p.data)
+
 
                 # Bias correction
                 # Please note that we are using the "efficient version" given in
@@ -58,3 +63,13 @@ class AdamW(Optimizer):
                 # Please note that the learning rate should be incorporated into this update.
 
         return loss
+
+"""
+# param_group example
+<class 'generator'>
+[{'params': [Parameter containing:
+tensor(0.9417, requires_grad=True), Parameter containing:
+tensor(0.7757, requires_grad=True)], 'lr': 0.001, 'betas': (0.9, 0.999), 'eps': 1e-08, 'weight_decay': 0, 'amsgrad': False}]
+
+http://mcneela.github.io/machine_learning/2019/09/03/Writing-Your-Own-Optimizers-In-Pytorch.html
+"""
