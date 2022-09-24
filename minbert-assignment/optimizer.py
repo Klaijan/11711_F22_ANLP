@@ -2,6 +2,7 @@ from typing import Callable, Iterable, Tuple
 
 import torch
 from torch.optim import Optimizer
+import math
 
 
 class AdamW(Optimizer):
@@ -49,18 +50,42 @@ class AdamW(Optimizer):
                     state['step'] = 0
                     # exp moving average of moving average (mean) of the gradient - first moment
                     state['exp_mean'] = torch.zeros_like(p.data)
-                    # exp moving average of uncentered variance of the gradient - second moment
+                    # exp moving average of uncentered variance (squared gradient) of the gradient - second moment
                     state['exp_var'] = torch.zeros_like(p.data)
 
+                state['step'] += 1
+                exp_mean, exp_var = state['exp_mean'], state['exp_var']
+                beta1, beta2 = group['betas']
+
+                exp_mean.mul_(beta1).add_(grad, alpha=(1.0-beta1))
+                exp_var.mul_(beta2).addcmul_(grad, grad, value=(1.0-beta2))
+                denom = exp_var.sqrt().add_(group['eps'])
 
                 # Bias correction
                 # Please note that we are using the "efficient version" given in
                 # https://arxiv.org/abs/1412.6980
+                if group['correct_bias']: # if group['correct_bias'] = True, 
+
+                    bias_correction1 = 1.0 - beta1 ** state['step']
+                    bias_correction2 = 1.0 - beta2 ** state['step']
+
+                    # alpha = alpha * ((bias_correction2) ** (1/2)) / bias_correction1
+                    alpha = alpha * math.sqrt(bias_correction2) / bias_correction1
 
                 # Update parameters
 
+                # p.data.addcmul_(-alpha, exp_mean, 1/(torch.sqrt(exp_var) + group['eps']))
+                # p.data.addcdiv_(exp_mean, torch.sqrt(exp_var) + group['eps'], value=-alpha)
+                p.data.addcdiv_(exp_mean, denom, value=-alpha)
+
                 # Add weight decay after the main gradient-based updates.
                 # Please note that the learning rate should be incorporated into this update.
+
+                if group['weight_decay'] != 0: # w = w - lr * w.grad - lr * wd * w http://www.fast.ai/2018/07/02/adam-weight-decay/
+                    # p.data
+                    p.data.add_(p.data, alpha=(-alpha * group["weight_decay"]))
+                
+                # https://towardsdatascience.com/why-adamw-matters-736223f31b5d
 
         return loss
 
