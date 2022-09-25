@@ -1,10 +1,13 @@
 import time, random, numpy as np, argparse, sys, re, os
+from turtle import forward
 from types import SimpleNamespace
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import classification_report, f1_score, recall_score, accuracy_score
+
+import torch.nn as nn
 
 # change it with respect to the original model
 from tokenizer import BertTokenizer
@@ -38,12 +41,23 @@ class BertSentClassifier(torch.nn.Module):
                 param.requires_grad = True
 
         # todo
-        raise NotImplementedError
+        # raise NotImplementedError
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.fc = nn.Linear(config.hidden_size, self.num_labels)
+        self.softmax = nn.LogSoftmax(dim=-1)
 
     def forward(self, input_ids, attention_mask):
         # todo
         # the final bert contextualize embedding is the hidden state of [CLS] token (the first token)
-        raise NotImplementedError
+
+        out = self.bert.forward(input_ids, attention_mask)
+        # import pdb; pdb.set_trace()
+        out = self.dropout(out['pooler_output'])
+        out = self.fc(out)
+        out = self.softmax(out)
+
+        return out
+        # raise NotImplementedError
 
 # create a custom Dataset Class to be used for the dataloader
 class BertDataset(Dataset):
