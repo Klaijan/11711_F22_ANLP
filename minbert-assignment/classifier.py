@@ -213,12 +213,14 @@ def train(args):
 
             optimizer.zero_grad()
             logits = model(b_ids, b_mask)
+            import pdb; pdb.set_trace()
+
             # loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
 
-            # criterion = nn.BCEWithLogitsLoss(reduction='sum')
-            # loss = criterion(logits, b_labels.views(-1)) / args.batch_size
+            criterion = nn.BCEWithLogitsLoss(reduction='sum')
+            loss = criterion(logits, b_labels.view(-1)) / args.batch_size
 
-            loss = F.cross_entropy(logits, b_labels.view(-1), reduction='sum') / args.batch_size
+            # loss = F.cross_entropy(logits, b_labels.view(-1), reduction='sum') / args.batch_size
 
             loss.backward()
             optimizer.step()
