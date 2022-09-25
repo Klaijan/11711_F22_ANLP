@@ -269,7 +269,8 @@ def get_args():
     parser.add_argument("--option", type=str,
                         help='pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated',
                         choices=('pretrain', 'finetune'), default="pretrain")
-    parser.add_argument("--use_gpu", action='store_true')
+    # parser.add_argument("--use_gpu", action='store_true')
+    parser.add_argument("--use_gpu", type=int, default=-1)
     parser.add_argument("--dev_out", type=str, default="cfimdb-dev-output.txt")
     parser.add_argument("--test_out", type=str, default="cfimdb-test-output.txt")
 
