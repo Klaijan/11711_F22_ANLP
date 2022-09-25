@@ -50,7 +50,7 @@ class BertSentClassifier(torch.nn.Module):
         # todo
         # the final bert contextualize embedding is the hidden state of [CLS] token (the first token)
 
-        out = self.bert.forward(input_ids, attention_mask)
+        out = self.bert(input_ids, attention_mask)
         # import pdb; pdb.set_trace()
 
         out = self.dropout(out['pooler_output'])
@@ -218,9 +218,6 @@ def train(args):
             # import pdb; pdb.set_trace()
 
             # loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
-
-            # criterion = nn.BCEWithLogitsLoss(reduction='sum')
-            # loss = criterion(logits, b_labels.view(-1)) / args.batch_size
 
             loss = F.cross_entropy(logits, b_labels.view(-1), reduction='sum') / args.batch_size
 
