@@ -43,8 +43,8 @@ class BertSentClassifier(torch.nn.Module):
         # todo
         # raise NotImplementedError
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        # self.softmax = nn.LogSoftmax(dim=-1)
         self.fc = nn.Linear(config.hidden_size, self.num_labels)
-        self.softmax = nn.LogSoftmax(dim=-1)
 
     def forward(self, input_ids, attention_mask):
         # todo
@@ -52,13 +52,14 @@ class BertSentClassifier(torch.nn.Module):
 
         out = self.bert.forward(input_ids, attention_mask)
         # import pdb; pdb.set_trace()
-        # out = self.dropout(out['pooler_output'])
-        # out = self.fc(out)
+
+        out = self.dropout(out['pooler_output'])
+        out = self.fc(out)
         # out = self.softmax(out)
 
-        out = self.fc(out['pooler_output'])
-        out = self.dropout(out)
-        out = self.softmax(out)
+        # out = self.fc(out['pooler_output'])
+        # out = self.dropout(out)
+        # out = self.softmax(out)
 
         return out
         # raise NotImplementedError
