@@ -57,9 +57,8 @@ class AdamW(Optimizer):
                 exp_mean, exp_var = state['exp_mean'], state['exp_var']
                 beta1, beta2 = group['betas']
 
-                exp_mean.mul_(beta1).add_(grad, alpha=(1.0-beta1))
-                exp_var.mul_(beta2).addcmul_(grad, grad, value=(1.0-beta2))
-                denom = exp_var.sqrt().add_(group['eps'])
+                exp_mean.mul_(beta1).add_(grad, alpha=(1-beta1))
+                exp_var.mul_(beta2).addcmul_(grad, grad, value=(1-beta2))
 
                 # Bias correction
                 # Please note that we are using the "efficient version" given in
@@ -70,13 +69,14 @@ class AdamW(Optimizer):
                     bias_correction2 = 1.0 - beta2 ** state['step']
 
                     # alpha = alpha * ((bias_correction2) ** (1/2)) / bias_correction1
-                    alpha = alpha * math.sqrt(bias_correction2) / bias_correction1
+                    alpha_t = alpha * math.sqrt(bias_correction2) / bias_correction1
+                else:
+                    alpha_t = alpha
 
                 # Update parameters
 
                 # p.data.addcmul_(-alpha, exp_mean, 1/(torch.sqrt(exp_var) + group['eps']))
-                # p.data.addcdiv_(exp_mean, torch.sqrt(exp_var) + group['eps'], value=-alpha)
-                p.data.addcdiv_(exp_mean, denom, value=-alpha)
+                p.data.addcdiv_(exp_mean, torch.sqrt(exp_var) + group['eps'], value=-alpha_t)
 
                 # Add weight decay after the main gradient-based updates.
                 # Please note that the learning rate should be incorporated into this update.
