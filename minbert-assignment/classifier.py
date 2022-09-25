@@ -52,8 +52,12 @@ class BertSentClassifier(torch.nn.Module):
 
         out = self.bert.forward(input_ids, attention_mask)
         # import pdb; pdb.set_trace()
-        out = self.dropout(out['pooler_output'])
-        out = self.fc(out)
+        # out = self.dropout(out['pooler_output'])
+        # out = self.fc(out)
+        # out = self.softmax(out)
+
+        out = self.fc(out['pooler_output'])
+        out = self.dropout(out)
         out = self.softmax(out)
 
         return out
@@ -209,7 +213,9 @@ def train(args):
 
             optimizer.zero_grad()
             logits = model(b_ids, b_mask)
-            loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
+            # loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
+            criterion = nn.BCEWithLogitsLoss(reduction='sum')
+            loss = criterion(logits, b_labels.views(-1)) / args.batch_size
 
             loss.backward()
             optimizer.step()
