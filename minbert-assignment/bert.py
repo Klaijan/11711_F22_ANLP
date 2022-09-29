@@ -1,3 +1,4 @@
+from asyncio.constants import LOG_THRESHOLD_FOR_CONNLOST_WRITES
 from typing import Dict, List, Optional, Union, Tuple, Callable
 import math
 import torch
@@ -55,7 +56,9 @@ class BertSelfAttention(nn.Module):
       attn_score = attn_score + attention_mask
 
     # normalize the scores
-    attn = F.softmax(attn_score, dim=-1) # across attentions scores, each key x query = last dim
+    # attn = F.softmax(attn_score, dim=-1) # across attentions scores, each key x query = last dim
+    logsoftmax = nn.LogSoftmax(-1)
+    attn = logsoftmax(attn_score)
     attn = self.dropout(attn)
 
     # multiply the attention scores to the value and get back V' 
