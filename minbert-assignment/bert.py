@@ -56,9 +56,7 @@ class BertSelfAttention(nn.Module):
       attn_score = attn_score + attention_mask
 
     # normalize the scores
-    # attn = F.softmax(attn_score, dim=-1) # across attentions scores, each key x query = last dim
-    logsoftmax = nn.LogSoftmax(-1)
-    attn = logsoftmax(attn_score)
+    attn = F.softmax(attn_score, dim=-1) # across attentions scores, each key x query = last dim
     attn = self.dropout(attn)
 
     # multiply the attention scores to the value and get back V' 
